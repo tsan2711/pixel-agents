@@ -38,7 +38,9 @@ export type ServerMessage =
   | ExternalAssetDirectoriesUpdated
   | AreaMappingsLoaded
   | WorkspaceFolders
-  | AgentDiagnostics;
+  | AgentDiagnostics
+  | AgentTranscript
+  | AgentActionResult;
 
 export type ClientMessage =
   | WebviewReady
@@ -62,7 +64,9 @@ export type ClientMessage =
   | RemoveExternalAssetDirectory
   | SaveAreaMappings
   | SetShowAreas
-  | RequestDiagnostics;
+  | RequestDiagnostics
+  | RequestTranscript
+  | SendToAgent;
 
 export interface ProviderCapabilities {
   type: 'providerCapabilities';
@@ -315,6 +319,31 @@ export interface AgentDiagnostics {
   agents: Record<string, any>[];
 }
 
+export interface AgentTranscript {
+  type: 'agentTranscript';
+  id: number;
+  messages: TranscriptMessage[];
+}
+
+export interface TranscriptMessage {
+  role: TranscriptRole;
+  text: string;
+  toolName?: string;
+  timestamp?: string;
+}
+
+export type TranscriptRole = 'user' | 'assistant' | 'tool';
+
+export interface AgentActionResult {
+  type: 'agentActionResult';
+  id: number;
+  action: AgentActionKind;
+  ok: boolean;
+  message?: string;
+}
+
+export type AgentActionKind = 'focus' | 'send';
+
 export interface WebviewReady {
   type: 'webviewReady';
 }
@@ -428,4 +457,15 @@ export interface SetShowAreas {
 
 export interface RequestDiagnostics {
   type: 'requestDiagnostics';
+}
+
+export interface RequestTranscript {
+  type: 'requestTranscript';
+  id: number;
+}
+
+export interface SendToAgent {
+  type: 'sendToAgent';
+  id: number;
+  text: string;
 }

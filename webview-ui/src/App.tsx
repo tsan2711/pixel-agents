@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toMajorMinor } from './changelogData.js';
+import { AgentChatPanel } from './components/AgentChatPanel.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { ConnectionIndicator } from './components/ConnectionIndicator.js';
@@ -233,6 +234,9 @@ function App() {
   }, []);
 
   const handleClick = useCallback((agentId: number) => {
+    // Standalone: a click selects (opening the chat panel); jumping to the terminal is the
+    // panel's explicit button, so browsing the office doesn't keep stealing window focus.
+    if (isBrowserRuntime) return;
     // If clicked agent is a sub-agent, focus the parent's terminal instead
     const os = getOfficeState();
     const meta = os.subagentMeta.get(agentId);
@@ -437,6 +441,7 @@ function App() {
             onCloseAgent={handleCloseAgent}
             alwaysShowOverlay={alwaysShowOverlay}
           />
+          {isBrowserRuntime && !editor.isEditMode && <AgentChatPanel officeState={officeState} />}
         </>
       ) : (
         <DebugView

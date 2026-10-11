@@ -7,6 +7,7 @@
  * speculation.
  */
 
+import type { TranscriptMessage } from './messages.js';
 import type { TeamProvider } from './teamProvider.js';
 
 // ── Normalized Events (all provider types produce these) ──────
@@ -139,6 +140,16 @@ export interface HookProvider {
     args: string[];
     env?: Record<string, string>;
   };
+
+  // ── Optional conversation + terminal discovery (standalone chat panel) ──
+
+  /** Recent conversation from a transcript file, oldest first, at most `maxMessages`.
+   *  Reads only the file's tail, so it stays cheap on multi-MB transcripts. */
+  readConversation?(transcriptPath: string, maxMessages: number): TranscriptMessage[];
+  /** Controlling TTY (e.g. `/dev/ttys003`) of the live CLI process running `sessionId`,
+   *  when the CLI publishes enough to find it. Lets a host without its own terminals
+   *  (standalone) focus or type into the user's terminal app. */
+  findSessionTty?(sessionId: string): string | undefined;
 
   // ── Optional team/subagent extension (Agent Teams on Claude; empty for single-agent CLIs) ──
 

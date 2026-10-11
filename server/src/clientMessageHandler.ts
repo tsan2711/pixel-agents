@@ -1,3 +1,5 @@
+import * as path from 'path';
+
 import type { HookProvider } from '../../core/src/provider.js';
 import { resendAgentActivity } from './agentActivityResend.js';
 import { buildAgentDiagnostics } from './agentDiagnostics.js';
@@ -12,6 +14,7 @@ import {
   writeConfig,
 } from './configPersistence.js';
 import { HUE_SHIFT_MAX_DEG, PALETTE_COUNT } from './constants.js';
+import { focusTerminal, sendToTerminal } from './externalTerminal.js';
 import { readLayoutFromFile, writeLayoutToFile } from './layoutPersistence.js';
 import type { ConsentEffects } from './providers/hook/consentExecutor.js';
 import { applyConsentChoice } from './providers/hook/consentExecutor.js';
@@ -60,6 +63,21 @@ export interface ClientMessageContext {
    * to false so a caller that forgets to pass it gets the safe answer.
    */
   privileged?: boolean;
+}
+
+/** Chat panel history depth. */
+const TRANSCRIPT_MAX_MESSAGES = 80;
+
+function providerFor(providerId: string | undefined): HookProvider {
+  return hookProviderById(providerId ?? claudeProvider.id) ?? claudeProvider;
+}
+
+/** TTY of the live CLI process behind an agent, if its provider can find one. */
+function sessionTtyOf(store: AgentStateStore, id: number): string | undefined {
+  const agent = store.get(id);
+  if (!agent) return undefined;
+  const sessionId = agent.sessionId || path.basename(agent.jsonlFile, '.jsonl');
+  return providerFor(agent.providerId).findSessionTty?.(sessionId);
 }
 
 // ── Setting key constants (mirror adapters/vscode/constants.ts) ──
@@ -270,8 +288,49 @@ export function handleClientMessage(
       break;
     }
 
+    case 'requestTranscript': {
+      // Point-to-point reply, like requestDiagnostics.
+      const id = msg.id as number;
+      const agent = store.get(id);
+      const provider = providerFor(agent?.providerId);
+      const messages =
+        agent?.jsonlFile && provider.readConversation
+          ? provider.readConversation(agent.jsonlFile, TRANSCRIPT_MAX_MESSAGES)
+          : [];
+      send({ type: 'agentTranscript', id, messages });
+      break;
+    }
+
+    case 'focusAgent': {
+      // Standalone owns no terminals: reach the user's terminal app by the session's TTY.
+      const id = msg.id as number;
+      void focusTerminal(sessionTtyOf(store, id)).then((r) =>
+        send({ type: 'agentActionResult', id, action: 'focus', ok: r.ok, message: r.message }),
+      );
+      break;
+    }
+
+    case 'sendToAgent': {
+      // Types into a process outside Pixel Agents — tokened connections only.
+      const id = msg.id as number;
+      if (!ctx.privileged) {
+        send({
+          type: 'agentActionResult',
+          id,
+          action: 'send',
+          ok: false,
+          message: 'Open the office from the tokened URL the CLI printed to send messages.',
+        });
+        break;
+      }
+      void sendToTerminal(sessionTtyOf(store, id), String(msg.text ?? '')).then((r) =>
+        send({ type: 'agentActionResult', id, action: 'send', ok: r.ok, message: r.message }),
+      );
+      break;
+    }
+
     default:
-      // focusAgent, exportLayout, importLayout
+      // exportLayout, importLayout
       // require IDE-specific handling (not yet implemented for standalone)
       break;
   }

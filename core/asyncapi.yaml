@@ -118,6 +118,9 @@ components:
         - $ref: '#/components/schemas/WorkspaceFolders'
         # Diagnostics
         - $ref: '#/components/schemas/AgentDiagnostics'
+        # Conversation
+        - $ref: '#/components/schemas/AgentTranscript'
+        - $ref: '#/components/schemas/AgentActionResult'
       discriminator: type
 
     ClientMessage:
@@ -144,6 +147,8 @@ components:
         - $ref: '#/components/schemas/SaveAreaMappings'
         - $ref: '#/components/schemas/SetShowAreas'
         - $ref: '#/components/schemas/RequestDiagnostics'
+        - $ref: '#/components/schemas/RequestTranscript'
+        - $ref: '#/components/schemas/SendToAgent'
       discriminator: type
 
     # ── Server message variants ────────────────────────────────────
@@ -786,6 +791,65 @@ components:
           items:
             type: object
 
+    AgentTranscript:
+      description: |
+        Recent conversation of one agent (response to requestTranscript), oldest first.
+        Built from the tail of the agent's transcript: user prompts, assistant text, and
+        one-line tool calls. Point-to-point, never broadcast.
+      type: object
+      additionalProperties: false
+      required: [type, id, messages]
+      properties:
+        type:
+          const: agentTranscript
+        id:
+          type: integer
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptMessage'
+
+    TranscriptMessage:
+      type: object
+      additionalProperties: false
+      required: [role, text]
+      properties:
+        role:
+          $ref: '#/components/schemas/TranscriptRole'
+        text:
+          type: string
+        toolName:
+          type: string
+        timestamp:
+          type: string
+
+    TranscriptRole:
+      type: string
+      enum: [user, assistant, tool]
+
+    AgentActionKind:
+      type: string
+      enum: [focus, send]
+
+    AgentActionResult:
+      description: |
+        Outcome of a focusAgent / sendToAgent request on hosts where it can fail
+        visibly (standalone driving an external terminal app). Point-to-point.
+      type: object
+      additionalProperties: false
+      required: [type, id, action, ok]
+      properties:
+        type:
+          const: agentActionResult
+        id:
+          type: integer
+        action:
+          $ref: '#/components/schemas/AgentActionKind'
+        ok:
+          type: boolean
+        message:
+          type: string
+
     # ── Client message variants ────────────────────────────────────
 
     WebviewReady:
@@ -821,6 +885,32 @@ components:
           const: focusAgent
         id:
           type: integer
+
+    RequestTranscript:
+      description: Ask for an agent's recent conversation (answered with agentTranscript).
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type:
+          const: requestTranscript
+        id:
+          type: integer
+
+    SendToAgent:
+      description: |
+        Type a message into the agent's terminal and press Enter. Privileged: it drives
+        a process outside Pixel Agents.
+      type: object
+      additionalProperties: false
+      required: [type, id, text]
+      properties:
+        type:
+          const: sendToAgent
+        id:
+          type: integer
+        text:
+          type: string
 
     CloseAgent:
       description: Close (dismiss) an agent.
